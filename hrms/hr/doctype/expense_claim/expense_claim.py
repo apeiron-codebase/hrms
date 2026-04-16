@@ -593,27 +593,22 @@ def update_reimbursed_amount(doc):
 
 def get_total_reimbursed_amount(doc):
 	if doc.is_paid:
-		# No need to check for cancelled state here as it will anyways update status as cancelled
 		return doc.grand_total
 	else:
-		JournalEntryAccount = frappe.qb.DocType("Journal Entry Account")
-		amount_via_jv = frappe.db.get_value(
-			"Journal Entry Account",
-			{"reference_name": doc.name, "docstatus": 1},
-			Sum(
-				JournalEntryAccount.debit_in_account_currency - JournalEntryAccount.credit_in_account_currency
-			),
-		)
+		amount_via_jv = frappe.db.sql("""
+			SELECT COALESCE(SUM(debit_in_account_currency - credit_in_account_currency), 0)
+			FROM "tabJournal Entry Account"
+			WHERE reference_name = %s
+			AND docstatus = 1
+		""", (doc.name,), as_list=True)[0][0]
 
-		amount_via_payment_entry = frappe.db.get_value(
-			"Payment Entry Reference",
-			{
-				"reference_name": doc.name,
-				"advance_voucher_type": None,
-				"docstatus": 1,
-			},
-			[{"SUM": "allocated_amount"}],
-		)
+		amount_via_payment_entry = frappe.db.sql("""
+			SELECT COALESCE(SUM(allocated_amount), 0)
+			FROM "tabPayment Entry Reference"
+			WHERE reference_name = %s
+			AND advance_voucher_type IS NULL
+			AND docstatus = 1
+		""", (doc.name,), as_list=True)[0][0]
 
 		return flt(amount_via_jv) + flt(amount_via_payment_entry)
 
