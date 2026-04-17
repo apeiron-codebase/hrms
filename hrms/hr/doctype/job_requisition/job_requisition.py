@@ -81,21 +81,30 @@ def make_job_opening(source_name, target_doc=None):
 
 
 @frappe.whitelist()
-def get_avg_time_to_fill(
-	company: str | None = None, department: str | None = None, designation: str | None = None
-):
-	filters = {"status": "Filled"}
-	if company:
-		filters["company"] = company
-	if department:
-		filters["department"] = department
-	if designation:
-		filters["designation"] = designation
+def get_avg_time_to_fill(company=None, department=None, designation=None):
+	conditions = ["status = 'Filled'"]
+	values = []
 
-	avg_time_to_fill = frappe.db.get_list(
-		"Job Requisition",
-		filters=filters,
-		fields=[{"AVG": "time_to_fill", "as": "average_time"}],
-	)[0].average_time
+	if company:
+		conditions.append("company = %s")
+		values.append(company)
+
+	if department:
+		conditions.append("department = %s")
+		values.append(department)
+
+	if designation:
+		conditions.append("designation = %s")
+		values.append(designation)
+
+	where_clause = " AND ".join(conditions)
+
+	result = frappe.db.sql(f"""
+		SELECT AVG(time_to_fill) as average_time
+		FROM "tabJob Requisition"
+		WHERE {where_clause}
+	""", values, as_dict=True)
+
+	avg_time_to_fill = result[0].get("average_time") if result else None
 
 	return format_duration(avg_time_to_fill) if avg_time_to_fill else 0

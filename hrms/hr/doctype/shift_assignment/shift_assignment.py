@@ -635,58 +635,55 @@ def get_shift_type(shift_type_name: str) -> dict:
 
 
 def get_shift_timings(shift_type: dict, for_timestamp: datetime) -> tuple:
-	start_time = shift_type.start_time
-	end_time = shift_type.end_time
+    start_time = shift_type.start_time
+    end_time = shift_type.end_time
 
-	shift_actual_start = get_time(
-		datetime.combine(for_timestamp, datetime.min.time())
-		+ start_time
-		- timedelta(minutes=shift_type.begin_check_in_before_shift_start_time)
-	)
-	shift_actual_end = get_time(
-		datetime.combine(for_timestamp, datetime.min.time())
-		+ end_time
-		+ timedelta(minutes=shift_type.allow_check_out_after_shift_end_time)
-	)
-	for_time = get_time(for_timestamp.time())
-	start_datetime = end_datetime = None
+    # Helper: convert time to timedelta for arithmetic with datetime
+    def as_timedelta(t):
+        return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
 
-	if start_time > end_time:
-		# shift spans across 2 different days
-		if for_time >= shift_actual_start:
-			# if for_timestamp is greater than start time, it's within the first day
-			start_datetime = datetime.combine(for_timestamp, datetime.min.time()) + start_time
-			for_timestamp += timedelta(days=1)
-			end_datetime = datetime.combine(for_timestamp, datetime.min.time()) + end_time
+    base = lambda ts: datetime.combine(ts, datetime.min.time())
 
-		elif for_time < shift_actual_start:
-			# if for_timestamp is less than start time, it's within the second day
-			end_datetime = datetime.combine(for_timestamp, datetime.min.time()) + end_time
-			for_timestamp += timedelta(days=-1)
-			start_datetime = datetime.combine(for_timestamp, datetime.min.time()) + start_time
-	elif (
-		shift_actual_start > shift_actual_end
-		and for_time < shift_actual_start
-		and get_time(end_time) > shift_actual_end
-	):
-		# for_timestamp falls within the margin period in the second day (after midnight)
-		# so shift started and ended on the previous day
-		for_timestamp += timedelta(days=-1)
-		end_datetime = datetime.combine(for_timestamp, datetime.min.time()) + end_time
-		start_datetime = datetime.combine(for_timestamp, datetime.min.time()) + start_time
-	elif (
-		shift_actual_start > shift_actual_end
-		and for_time > shift_actual_end
-		and get_time(start_time) < shift_actual_start
-	):
-		# for_timestamp falls within the margin period in the first day (before midnight)
-		# so shift started and ended on the next day
-		for_timestamp += timedelta(days=1)
-		start_datetime = datetime.combine(for_timestamp, datetime.min.time()) + start_time
-		end_datetime = datetime.combine(for_timestamp, datetime.min.time()) + end_time
-	else:
-		# start and end timings fall on the same day
-		start_datetime = datetime.combine(for_timestamp, datetime.min.time()) + start_time
-		end_datetime = datetime.combine(for_timestamp, datetime.min.time()) + end_time
+    shift_actual_start = get_time(
+        base(for_timestamp)
+        + as_timedelta(start_time)
+        - timedelta(minutes=shift_type.begin_check_in_before_shift_start_time)
+    )
+    shift_actual_end = get_time(
+        base(for_timestamp)
+        + as_timedelta(end_time)
+        + timedelta(minutes=shift_type.allow_check_out_after_shift_end_time)
+    )
+    for_time = get_time(for_timestamp.time())
+    start_datetime = end_datetime = None
 
-	return start_datetime, end_datetime
+    if start_time > end_time:
+        if for_time >= shift_actual_start:
+            start_datetime = base(for_timestamp) + as_timedelta(start_time)
+            for_timestamp += timedelta(days=1)
+            end_datetime = base(for_timestamp) + as_timedelta(end_time)
+        elif for_time < shift_actual_start:
+            end_datetime = base(for_timestamp) + as_timedelta(end_time)
+            for_timestamp += timedelta(days=-1)
+            start_datetime = base(for_timestamp) + as_timedelta(start_time)
+    elif (
+        shift_actual_start > shift_actual_end
+        and for_time < shift_actual_start
+        and get_time(end_time) > shift_actual_end
+    ):
+        for_timestamp += timedelta(days=-1)
+        end_datetime = base(for_timestamp) + as_timedelta(end_time)
+        start_datetime = base(for_timestamp) + as_timedelta(start_time)
+    elif (
+        shift_actual_start > shift_actual_end
+        and for_time > shift_actual_end
+        and get_time(start_time) < shift_actual_start
+    ):
+        for_timestamp += timedelta(days=1)
+        start_datetime = base(for_timestamp) + as_timedelta(start_time)
+        end_datetime = base(for_timestamp) + as_timedelta(end_time)
+    else:
+        start_datetime = base(for_timestamp) + as_timedelta(start_time)
+        end_datetime = base(for_timestamp) + as_timedelta(end_time)
+
+    return start_datetime, end_datetime

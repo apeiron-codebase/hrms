@@ -266,7 +266,6 @@ def get_base_attendance_query(filters):
 			attendance.company,
 		)
 		.where(attendance.docstatus == 1)
-		.groupby(attendance.name)
 	)
 
 	for field in filters:

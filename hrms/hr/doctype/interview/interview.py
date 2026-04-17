@@ -182,7 +182,7 @@ def get_skill_wise_average_rating(interview: str) -> list[dict]:
 		.join(interview_feedback)
 		.on(skill_assessment.parent == interview_feedback.name)
 		.where((interview_feedback.interview == interview) & (interview_feedback.docstatus == 1))
-		.groupby(skill_assessment.skill)
+		.groupby(skill_assessment.skill, skill_assessment.idx)
 		.orderby(skill_assessment.idx)
 	).run(as_dict=True)
 
