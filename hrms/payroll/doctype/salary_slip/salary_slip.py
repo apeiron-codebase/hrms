@@ -2281,17 +2281,22 @@ class SalarySlip(TransactionBase):
 		year_to_date = 0
 		period_start_date, period_end_date = self.get_year_to_date_period()
 
-		salary_slip_sum = frappe.get_list(
-			"Salary Slip",
-			fields=[{"SUM": "net_pay", "as": "net_sum"}, {"SUM": "gross_pay", "as": "gross_sum"}],
-			filters={
-				"employee": self.employee,
-				"start_date": [">=", period_start_date],
-				"end_date": ["<", period_end_date],
-				"name": ["!=", self.name],
-				"docstatus": 1,
-			},
-		)
+		salary_slip_sum = frappe.db.sql("""
+			SELECT 
+				SUM(net_pay) as net_sum,
+				SUM(gross_pay) as gross_sum
+			FROM `tabSalary Slip`
+			WHERE employee = %(employee)s
+				AND start_date >= %(period_start_date)s
+				AND end_date < %(period_end_date)s
+				AND name != %(name)s
+				AND docstatus = 1
+		""", {
+			"employee": self.employee,
+			"period_start_date": period_start_date,
+			"period_end_date": period_end_date,
+			"name": self.name,
+		}, as_dict=1)
 
 		year_to_date = flt(salary_slip_sum[0].net_sum) if salary_slip_sum else 0.0
 		gross_year_to_date = flt(salary_slip_sum[0].gross_sum) if salary_slip_sum else 0.0
@@ -2304,17 +2309,20 @@ class SalarySlip(TransactionBase):
 	def compute_month_to_date(self):
 		month_to_date = 0
 		first_day_of_the_month = get_first_day(self.start_date)
-		salary_slip_sum = frappe.get_list(
-			"Salary Slip",
-			fields=[{"SUM": "net_pay", "as": "sum"}],
-			filters={
-				"employee": self.employee,
-				"start_date": [">=", first_day_of_the_month],
-				"end_date": ["<", self.start_date],
-				"name": ["!=", self.name],
-				"docstatus": 1,
-			},
-		)
+		salary_slip_sum = frappe.db.sql("""
+			SELECT SUM(net_pay) as sum
+			FROM `tabSalary Slip`
+			WHERE employee = %(employee)s
+				AND start_date >= %(first_day)s
+				AND end_date < %(start_date)s
+				AND name != %(name)s
+				AND docstatus = 1
+		""", {
+			"employee": self.employee,
+			"first_day": first_day_of_the_month,
+			"start_date": self.start_date,
+			"name": self.name,
+		}, as_dict=1)
 
 		month_to_date = flt(salary_slip_sum[0].sum) if salary_slip_sum else 0.0
 
